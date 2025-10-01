@@ -78,7 +78,7 @@ app.get("/", (req, res) => {
 <title>달란트 잔치 정보</title>
 <style>
 :root{--glass:#ffffffa6; --glass-brd:#ffffffd9; --ink:#0f172a; --muted:#475569; --accent:#2563eb;}
-*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:900px;margin:0 auto;padding:28px 16px 80px} .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px} .brand{font-weight:900;font-size:28px;background:linear-gradient(90deg,#111,#334155,#64748b);-webkit-background-clip:text;background-clip:text;color:transparent} .nav{display:flex;gap:8px;flex-wrap:wrap} .nav a{padding:10px 16px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-brd);backdrop-filter:blur(8px);text-decoration:none;color:var(--ink);font-weight:700} .panel{background:var(--glass);border:1px solid var(--glass-brd);border-radius:24px;padding:24px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10);margin-bottom:20px} h2{margin:0 0 16px;border-bottom:1px solid var(--glass-brd);padding-bottom:12px} ul{padding-left:20px;line-height:1.8}
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:900px;margin:0 auto;padding:28px 16px 80px} .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px} .brand{font-weight:900;font-size:28px;background:linear-gradient(90deg,#111,#334155,#64748b);-webkit-background-clip:text;background-clip:text;color:transparent} .nav{display:flex;gap:8px;flex-wrap:wrap} .nav a{padding:10px 16px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-brd);backdrop-filter:blur(8px);text-decoration:none;color:var(--ink);font-weight:700} .panel{background:var(--glass);border:1px solid var(--glass-brd);border-radius:24px;padding:24px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10);margin-bottom:20px} h2{margin:0 0 16px;border-bottom:1px solid var(--glass-brd);padding-bottom:12px} ul{padding-left:20px;line-height:1.8} p{line-height:1.7; text-align:justify;} .footer-info{font-size:14px; color:var(--muted); text-align:center; margin-top: 40px;}
 </style>
 </head><body>
 <video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
@@ -92,25 +92,27 @@ app.get("/", (req, res) => {
   </div>
 
   <div class="panel">
-    <h2>🎈 부스 안내 (총 5개)</h2>
-    <ul>
-      <li><b>1번 부스 (먹거리):</b> 떡볶이, 어묵, 슬러시 판매</li>
-      <li><b>2번 부스 (놀거리):</b> 재미있는 보드게임</li>
-      <li><b>3번 부스 (만들기):</b> 나만의 키링 만들기 체험</li>
-      <li><b>4번 부스 (사진관):</b> 친구와 함께 인생네컷</li>
-      <li><b>5번 부스 (휴식):</b> 편안한 휴식 공간</li>
-    </ul>
+    <h2>🎈 달란트 잔치의 목적</h2>
+    <p>달란트잔치의 진정한 의미는 여러분이 가지고 있는 작은 달란트를 가만히 가지고 있는것이 아니라 여러분의 상황에 맞게 주님안에 발전시켜서 세상에 선한 영향력을 끼치는 겨자씨 청소년부가 되길 바라는 소망교회 성도님들과 여러분의 학부모님 그리고 선생님들의 마음이 모인 것 입니다.</p>
   </div>
 
   <div class="panel">
-    <h2>✨ 담당 선생님</h2>
+    <h2>✨ 부스 및 담당자 안내</h2>
     <ul>
-      <li><b>총괄:</b> 김주인 선생님</li>
-      <li><b>1번 부스:</b> 이하나 선생님</li>
-      <li><b>2번 부스:</b> 박두리 선생님</li>
-      <li><b>3번 부스:</b> 최서이 선생님</li>
-      <li><b>기타 문의:</b> 행정실 (02-1234-5678)</li>
+      <li><b>편의점:</b> 정다운 선생님</li>
+      <li><b>게임방:</b> 김지호 선생님</li>
+      <li><b>카페:</b> 박시온 선생님</li>
+      <li><b>소망은행:</b> 김주인 선생님</li>
+      <li><b>서점 및 중고나라:</b> 김기욱 집사님</li>
+      <li><b>올리브영:</b> 나찬민 전도사님</li>
+      <li><b>인생한컷:</b> 임하람 선생님</li>
+      <li><b>노래방:</b> 미정</li>
     </ul>
+  </div>
+
+  <div class="footer-info">
+    주최: 소망교회 겨자씨 청소년부<br>
+    장소: 베를린 소망교회 게마인데잘
   </div>
 </div>
 </body></html>`);
