@@ -46,7 +46,7 @@ const listTx       = db.prepare("SELECT card_token,delta,source,reason,booth,cre
 const getBoothByUser = db.prepare("SELECT * FROM booths WHERE username=?");
 const listAllBooths  = db.prepare("SELECT username,label FROM booths ORDER BY id ASC");
 const insertBooth     = db.prepare("INSERT INTO booths (username,password,label) VALUES (?,?,?)");
-const updateBoothInfo = db.prepare("UPDATE booths SET label=?, password=COALESE(NULLIF(?, ''), password) WHERE username=?");
+const updateBoothInfo = db.prepare("UPDATE booths SET label=?, password=COALESCE(NULLIF(?, ''), password) WHERE username=?");
 const deleteBoothUser = db.prepare("DELETE FROM booths WHERE username=?");
 const deleteCard = db.prepare("DELETE FROM cards WHERE token=?");
 const deleteTx   = db.prepare("DELETE FROM transactions WHERE card_token=?");
