@@ -52,6 +52,11 @@ const deleteCard = db.prepare("DELETE FROM cards WHERE token=?");
 const deleteTx   = db.prepare("DELETE FROM transactions WHERE card_token=?");
 
 // -------- 인증 --------
+function getBooth(req){
+  const raw = req.headers.cookie || "";
+  const hit = raw.split(";").map(s=>s.trim()).find(s=>s.startsWith("booth="));
+  return hit ? decodeURIComponent(hit.split("=")[1] || "") : "";
+}
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "somangberlin2025";
 
 // -------- '문지기' 미들웨어: 로그인 페이지를 제외한 모든 곳을 보호 --------
@@ -60,19 +65,62 @@ function checkLogin(req, res, next) {
   const isAdmin = raw.split(";").map(s => s.trim()).includes("adm=1");
 
   if (isAdmin) {
-    next(); // ✅ 로그인 되어있으면 통과
+    next();
   } else {
-    // ❌ 로그인 안 되어있으면 로그인 페이지로
     res.redirect("/login?ref=" + encodeURIComponent(req.originalUrl));
   }
 }
 
-// -------- 라우트: 로그인/로그아웃 (항상 공개) --------
-app.get("/login", (req, res) => {
-  const ref = req.query.ref || "/";
+// -------- 공개 정보 페이지 (새로운 홈페이지) --------
+app.get("/", (req, res) => {
   res.send(`<!doctype html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>로그인</title>
+<title>달란트 잔치 정보</title>
+<style>
+:root{--glass:#ffffffa6; --glass-brd:#ffffffd9; --ink:#0f172a; --muted:#475569; --accent:#2563eb;}
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:900px;margin:0 auto;padding:28px 16px 80px} .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px} .brand{font-weight:900;font-size:28px;background:linear-gradient(90deg,#111,#334155,#64748b);-webkit-background-clip:text;background-clip:text;color:transparent} .nav{display:flex;gap:8px;flex-wrap:wrap} .nav a{padding:10px 16px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-brd);backdrop-filter:blur(8px);text-decoration:none;color:var(--ink);font-weight:700} .panel{background:var(--glass);border:1px solid var(--glass-brd);border-radius:24px;padding:24px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10);margin-bottom:20px} h2{margin:0 0 16px;border-bottom:1px solid var(--glass-brd);padding-bottom:12px} ul{padding-left:20px;line-height:1.8}
+</style>
+</head><body>
+<video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
+<div class="wrap">
+  <div class="header">
+    <div class="brand">달란트 잔치 안내</div>
+    <div class="nav">
+      <a href="/login?ref=/dashboard">관리자 로그인</a>
+      <a href="/booth/login">부스 로그인</a>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>🎈 부스 안내 (총 5개)</h2>
+    <ul>
+      <li><b>1번 부스 (먹거리):</b> 떡볶이, 어묵, 슬러시 판매</li>
+      <li><b>2번 부스 (놀거리):</b> 재미있는 보드게임</li>
+      <li><b>3번 부스 (만들기):</b> 나만의 키링 만들기 체험</li>
+      <li><b>4번 부스 (사진관):</b> 친구와 함께 인생네컷</li>
+      <li><b>5번 부스 (휴식):</b> 편안한 휴식 공간</li>
+    </ul>
+  </div>
+
+  <div class="panel">
+    <h2>✨ 담당 선생님</h2>
+    <ul>
+      <li><b>총괄:</b> 김주인 선생님</li>
+      <li><b>1번 부스:</b> 이하나 선생님</li>
+      <li><b>2번 부스:</b> 박두리 선생님</li>
+      <li><b>3번 부스:</b> 최서이 선생님</li>
+      <li><b>기타 문의:</b> 행정실 (02-1234-5678)</li>
+    </ul>
+  </div>
+</div>
+</body></html>`);
+});
+
+// -------- 라우트: 로그인/로그아웃 (항상 공개) --------
+app.get("/login", (req, res) => {
+  const ref = req.query.ref || "/dashboard";
+  res.send(`<!doctype html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1" /><title>로그인</title>
 <style>
 :root{--glass:#ffffffa6; --glass-brd:#ffffffd9; --ink:#0f172a; --muted:#475569; --accent:#2563eb;}
 *{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:480px;margin:0 auto;padding:80px 16px;height:100%;display:flex;flex-direction:column;justify-content:center} .panel{background:var(--glass);border:1px solid var(--glass-brd);border-radius:24px;padding:32px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10)} .panel h2{margin:0 0 20px;text-align:center;font-size:28px} .form-group{margin-bottom:16px} input{width:100%;padding:14px 16px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffffd9;font-size:16px} button{width:100%;padding:14px 16px;border:none;border-radius:12px;background:var(--accent);color:#fff;cursor:pointer;font-weight:700;font-size:16px}
@@ -81,7 +129,7 @@ app.get("/login", (req, res) => {
 <video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
 <div class="wrap">
   <div class="panel">
-    <h2>로그인</h2>
+    <h2>관리자 로그인</h2>
     <form method="post" action="/login">
       <div class="form-group">
         <input type="password" name="password" placeholder="비밀번호" autofocus/>
@@ -98,23 +146,62 @@ app.post("/login", (req, res) => {
   const { password, ref } = req.body || {};
   if (password === ADMIN_PASSWORD) {
     res.setHeader("Set-Cookie", "adm=1; Path=/; HttpOnly; SameSite=Lax");
-    return res.redirect(ref || "/");
+    return res.redirect(ref || "/dashboard");
   }
-  res.send('비밀번호 오류. <a href="/login?ref='+encodeURIComponent(ref||"/")+'">다시</a>');
+  res.send('비밀번호 오류. <a href="/login?ref='+encodeURIComponent(ref||"/dashboard")+'">다시</a>');
 });
 
 app.get("/logout", (req, res) => {
   res.setHeader("Set-Cookie", "adm=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
-  res.redirect("/login");
+  res.redirect("/");
+});
+
+app.get("/booth/login", (req, res) => {
+  const ref = req.query.ref || "/";
+  res.send(`<!doctype html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1" /><title>부스 로그인</title>
+<style>
+:root{--glass:#ffffffa6; --glass-brd:#ffffffd9; --ink:#0f172a; --muted:#475569; --accent:#2563eb;}
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:480px;margin:0 auto;padding:80px 16px;height:100%;display:flex;flex-direction:column;justify-content:center} .panel{background:var(--glass);border:1px solid var(--glass-brd);border-radius:24px;padding:32px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10)} .panel h2{margin:0 0 20px;text-align:center;font-size:28px} .form-group{margin-bottom:16px} input{width:100%;padding:14px 16px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffffd9;font-size:16px} button{width:100%;padding:14px 16px;border:none;border-radius:12px;background:var(--accent);color:#fff;cursor:pointer;font-weight:700;font-size:16px}
+</style>
+</head><body>
+<video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
+<div class="wrap">
+  <div class="panel">
+    <h2>부스 로그인</h2>
+    <form method="post" action="/booth/login">
+      <div class="form-group"><input name="username" placeholder="부스 아이디" autofocus/></div>
+      <div class="form-group"><input type="password" name="password" placeholder="비밀번호" /></div>
+      <input type="hidden" name="ref" value="${ref}"/>
+      <button type="submit">로그인</button>
+    </form>
+  </div>
+</div>
+</body></html>`);
+});
+
+app.post("/booth/login", (req, res) => {
+  const { username, password, ref } = req.body || {};
+  const b = getBoothByUser.get(username||"");
+  if (b && b.password === password) {
+    res.setHeader("Set-Cookie", "booth="+encodeURIComponent(b.username)+"; Path=/; HttpOnly; SameSite=Lax");
+    return res.redirect(ref || "/");
+  }
+  res.send('부스 로그인 실패. <a href="/booth/login?ref='+encodeURIComponent(ref||"/")+'">다시</a>');
+});
+
+app.get("/booth/logout", (req, res) => {
+  res.setHeader("Set-Cookie", "booth=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
+  res.redirect("/");
 });
 
 
-// -------- 지금부터 나오는 모든 페이지는 로그인이 필요 --------
+// -------- 지금부터 나오는 모든 페이지는 관리자 로그인이 필요 --------
 app.use(checkLogin);
 
 
-// -------- 대시보드(전체 카드 목록) --------
-app.get("/", (req, res) => {
+// -------- 대시보드(전체 카드 목록) - 경로 변경 --------
+app.get("/dashboard", (req, res) => {
   const rows = listCards.all();
   let rowsHtml = "";
   rows.forEach((r, i) => {
@@ -123,7 +210,7 @@ app.get("/", (req, res) => {
       <td class="tok"><span>${r.token}</span></td>
       <td>${r.label||''}</td>
       <td class="bal">${r.balance}</td>
-      <td class="actions"><a href="/cards/${r.token}">관리</a></td>
+      <td class="actions"><a href="/cards/${r.token}">관리</a> · <a href="/b/${r.token}">부스 사용</a></td>
     </tr>`;
   });
 
@@ -135,18 +222,11 @@ app.get("/", (req, res) => {
 </style></head><body>
 <video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
 <div class="wrap">
-  <div class="header">
-    <div class="brand">달란트 대시보드</div>
-    <div class="nav">
-      <a href="/cards">카드 관리</a>
-      <a href="/booths">부스 관리</a>
-      <a href="/logout">로그아웃</a>
-    </div>
-  </div>
+  <div class="header"><div class="brand">달란트 대시보드</div><div class="nav"><a href="/cards">카드 관리</a><a href="/booths">부스 관리</a><a href="/logout">로그아웃</a></div></div>
   <div class="metrics"><div class="metric"><div class="lbl">등록 인원</div><div class="num" id="m-count">${rows.length}</div></div><div class="metric"><div class="lbl">총 잔액 합</div><div class="num" id="m-sum">0</div></div><div class="metric"><div class="lbl">평균 잔액</div><div class="num" id="m-avg">0</div></div></div>
   <div class="panel">
     <div class="toolbar"><label class="input"><input id="q" placeholder="이름/라벨 검색 (예: 홍길동)"></label><div class="segment"><button class="active" data-sort="idx">기본순</button><button data-sort="name">이름순</button><button data-sort="bal-desc">잔액↓</button><button data-sort="bal-asc">잔액↑</button></div></div>
-    <div class="tableWrap"><table id="tbl" aria-label="카드 목록"><colgroup><col style="width:64px"><col style="width:30%"><col style="width:26%"><col style="width:14%"><col style="width:16%"></colgroup><thead><tr><th>#</th><th>이름</th><th>라벨</th><th>잔액</th><th>열기</th></tr></thead><tbody id="tb">${rowsHtml}</tbody></table></div>
+    <div class="tableWrap"><table id="tbl" aria-label="카드 목록"><colgroup><col style="width:64px"><col style="width:30%"><col style="width:26%"><col style="width:14%"><col style="width:18%"></colgroup><thead><tr><th>#</th><th>이름</th><th>라벨</th><th>잔액</th><th>열기</th></tr></thead><tbody id="tb">${rowsHtml}</tbody></table></div>
   </div>
 </div>
 <script>
@@ -220,7 +300,7 @@ app.get("/booths", (req, res) => {
 </style></head><body>
 <video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
 <div class="wrap">
-  <div class="header"><div class="brand">부스 관리</div><div class="nav"><a href="/">대시보드</a><a href="/cards">카드 관리</a><a href="/logout">로그아웃</a></div></div>
+  <div class="header"><div class="brand">부스 관리</div><div class="nav"><a href="/dashboard">대시보드</a><a href="/cards">카드 관리</a><a href="/logout">로그아웃</a></div></div>
   <div class="panel"><label class="small">새 부스 추가</label><form method="post" action="/booth/create" class="inputRow"><input name="username" placeholder="아이디 (예: booth1)" required><input name="label" placeholder="표시명 (예: 1번 부스)" required><input type="password" name="password" placeholder="비밀번호 (예: 1111)" required><button class="btn" type="submit">추가</button></form></div>
   <div class="panel"><div class="toolbar"><label class="inputSearch"><input id="q" placeholder="아이디/표시명 검색"></label><div style="opacity:.8;color:#64748b">총 ${rows.length}개 부스</div></div><div class="tableWrap"><table aria-label="부스 목록"><thead><tr><th>#</th><th>아이디</th><th>표시명</th><th>작업</th></tr></thead><tbody id="tb">${rowsHtml}</tbody></table></div></div>
 </div>
@@ -240,7 +320,6 @@ app.get("/booths", (req, res) => {
 })();
 </script></body></html>`);
 });
-
 
 // ====== 카드(사람) 관리 ======
 app.get("/cards", (req, res) => {
@@ -270,9 +349,9 @@ app.get("/cards", (req, res) => {
 </style></head><body>
 <video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
 <div class="wrap">
-  <div class="header"><div class="brand">카드(사람) 관리</div><div class="nav"><a href="/">대시보드</a><a href="/booths">부스 관리</a><a href="/logout">로그아웃</a></div></div>
+  <div class="header"><div class="brand">카드(사람) 관리</div><div class="nav"><a href="/dashboard">대시보드</a><a href="/booths">부스 관리</a><a href="/logout">로그아웃</a></div></div>
   <div class="panel"><div class="grid"><div><label class="small">단일 추가/수정</label><form method="post" action="/card/upsert" class="row"><input name="token" placeholder="이름/토큰 (예: hong01)" required><input name="label" placeholder="라벨(선택, 예: 홍길동)"><input type="number" name="balance" placeholder="초기 잔액(예: 300)" required><button class="btn" type="submit">저장</button></form></div><div><label class="small">일괄 등록/수정 (토큰,초기잔액,라벨)</label><form method="post" action="/card/bulk"><textarea name="bulk" rows="7" placeholder="hong01,300,홍길동\nkim02,280,김철수"></textarea><div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end"><button class="btn" type="submit">일괄 적용</button></div></form></div></div></div>
-  <div class="panel"><div class="toolbar"><label class="input"><input id="q" placeholder="이름/라벨 검색"></label><div class="segment" role="tablist" aria-label="정렬"><button class="active" data-sort="idx">기본순</button><button data-sort="name">이름순</button><button data-sort="bal-desc">잔액↓</button><button data-sort="bal-asc">잔액↑</button></div></div><div class="tableWrap"><table aria-label="카드 목록"><colgroup><col style="width:64px"><col style="width:30%"><col style="width:26%"><col style="width:14%"><col style="width:16%"></colgroup><thead><tr><th>#</th><th>이름/토큰</th><th>라벨</th><th>잔액</th><th>작업</th></tr></thead><tbody id="tb">${rowsHtml}</tbody></table></div></div>
+  <div class="panel"><div class="toolbar"><label class="input"><input id="q" placeholder="이름/라벨 검색"></label><div class="segment" role="tablist" aria-label="정렬"><button class="active" data-sort="idx">기본순</button><button data-sort="name">이름순</button><button data-sort="bal-desc">잔액↓</button><button data-sort="bal-asc">잔액↑</button></div></div><div class="tableWrap"><table aria-label="카드 목록"><colgroup><col style="width:64px"><col style="width:30%"><col style="width:26%"><col style="width:14%"><col style="width:18%"></colgroup><thead><tr><th>#</th><th>이름/토큰</th><th>라벨</th><th>잔액</th><th>작업</th></tr></thead><tbody id="tb">${rowsHtml}</tbody></table></div></div>
 </div>
 <script>
 (function(){
@@ -320,23 +399,96 @@ app.get("/cards/:token", (req, res) => {
 </style></head><body>
 <video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
 <div class="wrap">
-  <div class="header"><div class="brand">개별 카드 관리</div><div class="nav"><a href="/">대시보드</a><a href="/cards">카드 목록</a><a href="/logout">로그아웃</a></div></div>
+  <div class="header"><div class="brand">개별 카드 관리</div><div class="nav"><a href="/dashboard">대시보드</a><a href="/cards">카드 목록</a><a href="/logout">로그아웃</a></div></div>
   <div class="grid">
     <div class="card"><h2>${token} <span class="badge">${c.label || "라벨 없음"}</span></h2><div class="sub">토큰(이름) · 라벨 · 현재 잔액을 관리합니다.</div><div class="balance"><div class="num" id="bal">${c.balance}</div><div class="sub">현재 잔액</div></div><div class="actions"><button class="btn" onclick="adj( 1)">+1</button><button class="btn" onclick="adj( 5)">+5</button><button class="btn" onclick="adj(10)">+10</button><button class="btn gray" onclick="adj(-1)">-1</button><button class="btn gray" onclick="adj(-5)">-5</button><button class="btn gray" onclick="adj(-10)">-10</button></div><div class="row"><input id="custom" type="number" placeholder="임의 증감 (예:+250 / -30)"><button class="btn" onclick="custom()">적용</button></div><div class="row"><input id="setv" type="number" placeholder="잔액을 특정 값으로 설정 (예: 280)"><button class="btn ghost" onclick="applySet()">잔액 설정</button></div><div class="row"><input id="label" type="text" value="${c.label||''}" placeholder="라벨 변경 (예: 2학년)"><button class="btn" onclick="saveLabel()">라벨 저장</button></div></div>
     <div class="card"><h3>최근 내역</h3><div class="tableWrap" style="margin-top:8px"><table><thead><tr><th>시간</th><th>변동</th><th>출처</th><th>부스</th><th>사유</th></tr></thead><tbody id="tx">${txHtml}</tbody></table></div></div>
   </div>
 </div>
 <script>
-// (script 코드는 길어서 생략... 원래 코드와 동일)
+(async function(){
+  async function api(path, body){
+    const r = await fetch(path, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
+    return r.json();
+  }
+  window.adj = async function(delta){
+    const res = await api("/api/admin-apply", { token:"${token}", delta, reason:"" });
+    if(res.ok) document.getElementById('bal').textContent = res.balance; else alert("실패");
+    location.reload();
+  };
+  window.custom = async function(){
+    const delta = parseInt(document.getElementById('custom').value || "0");
+    if(!delta) return;
+    const res = await api("/api/admin-apply", { token:"${token}", delta, reason:"" });
+    if(res.ok) document.getElementById('bal').textContent = res.balance; else alert("실패");
+    location.reload();
+  };
+  window.applySet = async function(){
+    const value = parseInt(document.getElementById('setv').value);
+    if(!Number.isInteger(value)) return;
+    const res = await api("/api/admin-set-balance", { token:"${token}", value });
+    if(res.ok) document.getElementById('bal').textContent = res.balance; else alert("실패");
+    location.reload();
+  };
+  window.saveLabel = async function(){
+    const label = document.getElementById('label').value;
+    const res = await api("/api/label", { token:"${token}", label });
+    if(res.ok) location.reload(); else alert("실패");
+  };
+})();
 </script></body></html>`);
 });
 
+// -------- 부스 사용 페이지 --------
+app.get("/b/:token", (req, res) => {
+  const token = req.params.token;
+  ensureCard.run(token);
+  const c = getCard.get(token);
+  const boothUser = getBooth(req);
+  const txs = listTx.all(token);
+  let txHtml = "";
+  txs.forEach(t=>{
+    txHtml += `<tr>
+      <td>${t.created_at}</td>
+      <td class="${t.delta>=0?'plus':'minus'}">${t.delta>=0?'+':''}${t.delta}</td>
+      <td>${t.source}</td>
+      <td>${t.booth||''}</td>
+      <td>${t.reason||''}</td>
+    </tr>`;
+  });
+
+  res.send(`<!doctype html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1" /><title>${token} · 부스 사용</title>
+<style>
+:root{ --glass:#ffffffa6; --glass-brd:#ffffffd9; --ink:#0f172a; --muted:#475569; --accent:#2563eb; }
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:900px;margin:0 auto;padding:28px 16px 80px} .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px} .brand{font-weight:900;font-size:26px;background:linear-gradient(90deg,#111,#334155,#64748b);-webkit-background-clip:text;background-clip:text;color:transparent} .nav{display:flex;gap:8px;flex-wrap:wrap} .nav a{padding:8px 12px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-brd);backdrop-filter:blur(8px);text-decoration:none;color:var(--ink);font-weight:600} .grid{display:grid;grid-template-columns:1fr;gap:14px} @media (min-width:860px){ .grid{grid-template-columns:1fr 1fr} } .card{background:var(--glass);border:1px solid var(--glass-brd);border-radius:18px;padding:16px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10)} h2,h3{margin:0 0 10px} .sub{color:#64748b;font-size:13px} .badge{display:inline-block;padding:6px 12px;border-radius:999px;background:#eef2ff;border:1px solid #dbeafe;color:#1e3a8a;font-weight:700} .balance{display:flex;align-items:baseline;gap:10px;margin:8px 0 12px} .balance .num{font-size:44px;font-weight:900} .actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px} .btn{padding:10px 14px;border:none;border-radius:10px;background:#111;color:#fff;cursor:pointer;font-weight:700} .btn.primary{background:var(--accent)} .btn.danger{background:#ef4444} .row{display:grid;grid-template-columns:1fr auto;gap:8px} input,textarea{width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffffd9} .notice{padding:10px 12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;margin-bottom:10px} .tableWrap{background:var(--glass);border:1px solid var(--glass-brd);border-radius:18px;padding:8px;backdrop-filter:blur(12px);box-shadow:0 14px 48px rgba(0,0,0,.12)} table{width:100%;border-collapse:separate;border-spacing:0;border-radius:14px;overflow:hidden} th,td{padding:12px 10px;border-bottom:1px solid #e2e8f0;background:#ffffffcc} th{background:#f8fafc;font-weight:800} tr:last-child td{border-bottom:none} .plus{color:#16a34a;font-weight:900} .minus{color:#dc2626;font-weight:900} .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+</style></head><body>
+<video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
+<div class="wrap">
+  <div class="header"><div class="brand">부스 사용</div><div class="nav"><a href="/dashboard">대시보드</a><a href="/booth/login?ref=${encodeURIComponent("/b/"+token)}">${boothUser ? "부스 전환" : "부스 로그인"}</a>${boothUser ? `<span class="mono" style="padding:8px 10px;border-radius:10px;background:#ffffffb8;border:1px solid #e2e8f0">현재부스: ${boothUser}</span>` : ''}</div></div>
+  <div class="grid">
+    <div class="card"><h2>${token} <span class="badge">잔액</span></h2><div class="balance"><div class="num" id="bal">${c.balance}</div><div class="sub">point</div></div>${boothUser ? '' : '<div class="notice">부스 로그인이 필요합니다. 오른쪽 상단의 “부스 로그인”을 눌러 로그인하세요.</div>'}<div class="actions"><button class="btn" onclick="dec(1)" ${boothUser?'':'disabled'}>-1</button><button class="btn" onclick="dec(5)" ${boothUser?'':'disabled'}>-5</button><button class="btn" onclick="dec(10)" ${boothUser?'':'disabled'}>-10</button></div><div class="row"><input id="n" type="number" min="1" placeholder="차감할 수량 (예: 3)" ${boothUser?'':'disabled'}><button class="btn primary" onclick="bulk()" ${boothUser?'':'disabled'}>차감</button></div><div class="row" style="margin-top:8px"><input id="reason" type="text" placeholder="사유/메모 (선택)" ${boothUser?'':'disabled'}></div><div class="sub" style="margin-top:8px">부스는 <b>차감만</b> 가능하며, 추가/잔액설정은 관리자 페이지에서 수행하세요.</div></div>
+    <div class="card"><h3>최근 내역</h3><div class="tableWrap" style="margin-top:8px"><table><thead><tr><th>시간</th><th>변동</th><th>출처</th><th>부스</th><th>사유</th></tr></thead><tbody id="tx">${txHtml}</tbody></table></div></div>
+  </div>
+</div>
+<script>
+(function(){
+  async function apply(delta, reason){
+    const r = await fetch("/api/booth-apply", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ token: "${token}", delta: delta, reason: reason }) });
+    const j = await r.json();
+    if(!j.ok){ alert(j.msg||"실패"); return null; }
+    return j.balance;
+  }
+  window.dec = async function(n){ const bal = await apply(-Math.abs(parseInt(n,10)||1), document.getElementById("reason").value||""); if(bal==null) return; document.getElementById("bal").textContent = bal; location.reload(); };
+  window.bulk = async function(){ const v = parseInt(document.getElementById("n").value||"0",10); if(!v || v<1){ alert("1 이상 입력하세요"); return; } const reason = document.getElementById("reason").value||""; const bal = await apply(-v, reason); if(bal==null) return; document.getElementById("n").value=""; document.getElementById("bal").textContent = bal; location.reload(); };
+})();
+</script></body></html>`);
+});
 
 // -------- API --------
 app.post("/api/admin-apply", (req, res) => {
   const { token, delta, reason } = req.body || {};
   if (!token || !Number.isInteger(delta)) return res.status(400).json({ ok:false });
-  ensureCard.run(token);
   insertTx.run(token, delta, "admin", reason||"", "");
   updateBal.run(delta, token);
   const card = getCard.get(token);
@@ -345,7 +497,6 @@ app.post("/api/admin-apply", (req, res) => {
 app.post("/api/admin-set-balance", (req, res) => {
   const { token, value } = req.body || {};
   if (!token || !Number.isInteger(value)) return res.status(400).json({ ok:false });
-  ensureCard.run(token);
   const before = getCard.get(token)?.balance ?? 0;
   const delta = value - before;
   insertTx.run(token, delta, "admin", "set-balance", "");
@@ -356,12 +507,22 @@ app.post("/api/admin-set-balance", (req, res) => {
 app.post("/api/label", (req, res) => {
   const { token, label } = req.body || {};
   if (!token) return res.status(400).json({ ok:false });
-  ensureCard.run(token);
   setLabel.run(label||"", token);
   res.json({ ok:true });
 });
+app.post("/api/booth-apply", (req, res) => {
+  const { token, delta, reason } = req.body || {};
+  if (!token || !Number.isInteger(delta)) return res.status(400).json({ ok:false, msg:"bad params" });
+  if (delta >= 0) return res.status(400).json({ ok:false, msg:"부스는 차감만" });
+  const boothUser = getBooth(req);
+  if (!boothUser) return res.status(401).json({ ok:false, msg:"부스 로그인 필요" });
+  insertTx.run(token, delta, "booth", reason||"", boothUser);
+  updateBal.run(delta, token);
+  const card = getCard.get(token);
+  res.json({ ok:true, balance: card.balance });
+});
 
-// 카드 일괄 등록/수정
+// 카드 CRUD
 app.post("/card/bulk", (req, res) => {
   const lines = (req.body?.bulk||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   const tx = db.transaction(arr=>{
@@ -377,8 +538,6 @@ app.post("/card/bulk", (req, res) => {
   tx(lines);
   res.redirect("/cards");
 });
-
-// 카드 단일 추가/수정
 app.post("/card/upsert", (req, res) => {
   const { token, label, balance } = req.body || {};
   const bal = parseInt(balance, 10);
@@ -393,7 +552,6 @@ app.post("/card/upsert", (req, res) => {
   `).run(token.trim(), (label||"").trim(), bal);
   res.redirect("/cards");
 });
-
 app.post("/card/delete", (req, res) => {
   const { token } = req.body || {};
   if (token) {
@@ -422,7 +580,6 @@ app.post("/booth/delete", (req, res) => {
   deleteBoothUser.run(username.trim());
   res.redirect("/booths");
 });
-
 
 // -------- 서버 시작 --------
 const PORT = process.env.PORT || 3000;
