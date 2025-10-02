@@ -59,7 +59,7 @@ function getBooth(req){
 }
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "somangberlin2025";
 
-// -------- '문지기' 미들웨어: 로그인 페이지를 제외한 모든 곳을 보호 --------
+// -------- '문지기' 미들웨어: 관리자 페이지 보호 --------
 function checkLogin(req, res, next) {
   const raw = req.headers.cookie || "";
   const isAdmin = raw.split(";").map(s => s.trim()).includes("adm=1");
@@ -71,7 +71,7 @@ function checkLogin(req, res, next) {
   }
 }
 
-// -------- 공개 정보 페이지 (새로운 홈페이지) --------
+// -------- 공개 정보 페이지 (홈페이지) --------
 app.get("/", (req, res) => {
   res.send(`<!doctype html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -114,6 +114,45 @@ app.get("/", (req, res) => {
     주최: 소망교회 겨자씨 청소년부<br>
     장소: 베를린 소망교회 게마인데잘
   </div>
+</div>
+</body></html>`);
+});
+
+// ====== 개인 카드 확인 페이지 (심플 버전) ======
+app.get("/c/:token", (req, res) => {
+  const token = req.params.token;
+  ensureCard.run(token);
+  const c = getCard.get(token);
+
+  res.send(`<!doctype html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${c.label || token}님 달란트 현황</title>
+<style>
+:root{--glass:#ffffffa6; --glass-brd:#ffffffd9; --ink:#0f172a; --muted:#475569; --accent:#2563eb;}
+*{box-sizing:border-box}
+html,body{height:100vh;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink); text-align:center; display:flex; flex-direction:column; justify-content:center; align-items:center;}
+video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2}
+.shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.1),rgba(0,0,0,.2));z-index:-1}
+.booth-link{position:fixed; top:20px; right:20px; padding:8px 14px; border-radius:999px; background:var(--glass); border:1px solid var(--glass-brd); backdrop-filter:blur(8px); text-decoration:none; color:var(--ink); font-weight:600; font-size:14px;}
+.main-title{font-size:20px; font-weight:700; color:white; opacity:0.8;}
+.name{font-size:28px; font-weight:900; color:white; margin-top:12px;}
+.balance-box{margin:12px 0 24px;}
+.balance-label{font-size:48px; font-weight:600; color:white; opacity:0.9;}
+.balance-amount{font-size:120px; font-weight:900; color:white; line-height:1;}
+.footer-text{font-size:16px; color:white; opacity:0.8; max-width:300px; margin:0 auto;}
+</style>
+</head><body>
+<video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
+<a href="/b/${token}" class="booth-link">부스 관리자용</a>
+
+<div class="content">
+  <div class="main-title">겨자씨 청소년부 달란트 잔치</div>
+  <div class="name">${c.label || token} 님</div>
+  <div class="balance-box">
+    <span class="balance-label">달란트</span>
+    <div class="balance-amount">${c.balance}</div>
+  </div>
+  <p class="footer-text">여러분이 최선을 다해 모은 달란트를 잘 활용해보세요.</p>
 </div>
 </body></html>`);
 });
@@ -488,7 +527,7 @@ app.get("/b/:token", (req, res) => {
 });
 
 // -------- API --------
-app.post("/api/admin-apply", (req, res) => {
+app.post("/api/admin-apply", checkLogin, (req, res) => {
   const { token, delta, reason } = req.body || {};
   if (!token || !Number.isInteger(delta)) return res.status(400).json({ ok:false });
   insertTx.run(token, delta, "admin", reason||"", "");
@@ -496,7 +535,7 @@ app.post("/api/admin-apply", (req, res) => {
   const card = getCard.get(token);
   res.json({ ok:true, balance: card.balance });
 });
-app.post("/api/admin-set-balance", (req, res) => {
+app.post("/api/admin-set-balance", checkLogin, (req, res) => {
   const { token, value } = req.body || {};
   if (!token || !Number.isInteger(value)) return res.status(400).json({ ok:false });
   const before = getCard.get(token)?.balance ?? 0;
@@ -506,7 +545,7 @@ app.post("/api/admin-set-balance", (req, res) => {
   const card = getCard.get(token);
   res.json({ ok:true, balance: card.balance });
 });
-app.post("/api/label", (req, res) => {
+app.post("/api/label", checkLogin, (req, res) => {
   const { token, label } = req.body || {};
   if (!token) return res.status(400).json({ ok:false });
   setLabel.run(label||"", token);
@@ -525,7 +564,7 @@ app.post("/api/booth-apply", (req, res) => {
 });
 
 // 카드 CRUD
-app.post("/card/bulk", (req, res) => {
+app.post("/card/bulk", checkLogin, (req, res) => {
   const lines = (req.body?.bulk||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   const tx = db.transaction(arr=>{
     arr.forEach(line=>{
@@ -540,7 +579,7 @@ app.post("/card/bulk", (req, res) => {
   tx(lines);
   res.redirect("/cards");
 });
-app.post("/card/upsert", (req, res) => {
+app.post("/card/upsert", checkLogin, (req, res) => {
   const { token, label, balance } = req.body || {};
   const bal = parseInt(balance, 10);
   if (!token || !Number.isInteger(bal)) return res.status(400).send("bad params");
@@ -554,7 +593,7 @@ app.post("/card/upsert", (req, res) => {
   `).run(token.trim(), (label||"").trim(), bal);
   res.redirect("/cards");
 });
-app.post("/card/delete", (req, res) => {
+app.post("/card/delete", checkLogin, (req, res) => {
   const { token } = req.body || {};
   if (token) {
     deleteTx.run(token);
@@ -564,19 +603,19 @@ app.post("/card/delete", (req, res) => {
 });
 
 // 부스 CRUD
-app.post("/booth/create", (req, res) => {
+app.post("/booth/create", checkLogin, (req, res) => {
   const { username, label, password } = req.body || {};
   if (!username || !label || !password) return res.status(400).send("bad params");
   try { insertBooth.run(username.trim(), password, label.trim()); res.redirect("/booths"); }
   catch { res.status(400).send("이미 존재"); }
 });
-app.post("/booth/update", (req, res) => {
+app.post("/booth/update", checkLogin, (req, res) => {
   const { username, label, password } = req.body || {};
   if (!username) return res.status(400).send("bad params");
   updateBoothInfo.run(label?.trim()||"", (password||"").trim(), username.trim());
   res.redirect("/booths");
 });
-app.post("/booth/delete", (req, res) => {
+app.post("/booth/delete", checkLogin, (req, res) => {
   const { username } = req.body || {};
   if (!username) return res.status(400).send("bad params");
   deleteBoothUser.run(username.trim());
