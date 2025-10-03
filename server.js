@@ -6,8 +6,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-// -------- DB --------
-const db = new Database("/data/db.sqlite"); // 영구 디스크 경로 확인
+// -------- DB (영구 디스크 경로를 다시 원래대로 수정) --------
+const db = new Database("./db.sqlite");
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS cards (
@@ -43,7 +43,7 @@ const setBal          = db.prepare("UPDATE cards SET balance=?, updated_at=datet
 const updateBal       = db.prepare("UPDATE cards SET balance=balance+?, updated_at=datetime('now') WHERE token=?");
 const insertTx        = db.prepare("INSERT INTO transactions (card_token, delta, source, reason, booth) VALUES (?,?,?,?,?)");
 const listAllTxForCard= db.prepare("SELECT card_token,delta,source,reason,booth,created_at FROM transactions WHERE card_token=? ORDER BY id DESC");
-const listAllTx       = db.prepare("SELECT * FROM transactions ORDER BY id ASC"); // 다운로드를 위한 새 쿼리
+const listAllTx       = db.prepare("SELECT * FROM transactions ORDER BY id ASC");
 const getBoothByUser  = db.prepare("SELECT * FROM booths WHERE username=?");
 const listAllBooths   = db.prepare("SELECT username,label FROM booths ORDER BY id ASC");
 const insertBooth     = db.prepare("INSERT INTO booths (username,password,label) VALUES (?,?,?)");
@@ -332,7 +332,15 @@ app.get("/dashboard", (req, res) => {
 </style></head><body>
 <video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
 <div class="wrap">
-  <div class="header"><div class="brand">달란트 대시보드</div><div class="nav"><a href="/cards">카드 관리</a><a href="/booths">부스 관리</a><a href="/logout">로그아웃</a></div></div>
+  <div class="header">
+    <div class="brand">달란트 대시보드</div>
+    <div class="nav">
+      <a href="/cards">카드 관리</a>
+      <a href="/booths">부스 관리</a>
+      <a href="/download-tx" class="btn gray">거래내역 다운로드</a>
+      <a href="/logout">로그아웃</a>
+    </div>
+  </div>
   <div class="metrics"><div class="metric"><div class="lbl">등록 인원</div><div class="num" id="m-count">${rows.length}</div></div><div class="metric"><div class="lbl">총 잔액 합</div><div class="num" id="m-sum">0</div></div><div class="metric"><div class="lbl">평균 잔액</div><div class="num" id="m-avg">0</div></div></div>
   <div class="panel">
     <div class="toolbar"><label class="input"><input id="q" placeholder="이름/라벨 검색 (예: 홍길동)"></label><div class="segment"><button class="active" data-sort="idx">기본순</button><button data-sort="name">이름순</button><button data-sort="bal-desc">잔액↓</button><button data-sort="bal-asc">잔액↑</button></div></div>
@@ -653,6 +661,21 @@ app.post("/booth/delete", (req, res) => {
   if (!username) return res.status(400).send("bad params");
   deleteBoothUser.run(username.trim());
   res.redirect("/booths");
+});
+
+// 거래내역 다운로드 (CSV)
+app.get("/download-tx", (req, res) => {
+  const rows = listAllTx.all();
+  // CSV 헤더
+  let csv = "ID,카드토큰,변동량,출처,사유,부스,시간\n";
+  // CSV 내용
+  rows.forEach(r => {
+    csv += [r.id, r.card_token, r.delta, r.source, `"${r.reason||''}"`, `"${r.booth||''}"`, r.created_at].join(",") + "\n";
+  });
+  
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", "attachment; filename=transactions.csv");
+  res.send(Buffer.from(csv, 'utf-8'));
 });
 
 
