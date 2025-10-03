@@ -7,7 +7,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
 // -------- DB --------
-const db = new Database("./db.sqlite");
+const db = new Database("/data/db.sqlite"); // 영구 디스크 경로 확인
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS cards (
@@ -35,21 +35,22 @@ CREATE TABLE IF NOT EXISTS booths (
 );
 `);
 
-const ensureCard   = db.prepare("INSERT OR IGNORE INTO cards (token) VALUES (?)");
-const getCard      = db.prepare("SELECT * FROM cards WHERE token=?");
-const listCards    = db.prepare("SELECT token,label,balance,updated_at FROM cards ORDER BY token ASC");
-const setLabel     = db.prepare("UPDATE cards SET label=? WHERE token=?");
-const setBal       = db.prepare("UPDATE cards SET balance=?, updated_at=datetime('now') WHERE token=?");
-const updateBal    = db.prepare("UPDATE cards SET balance=balance+?, updated_at=datetime('now') WHERE token=?");
-const insertTx     = db.prepare("INSERT INTO transactions (card_token, delta, source, reason, booth) VALUES (?,?,?,?,?)");
-const listTx       = db.prepare("SELECT card_token,delta,source,reason,booth,created_at FROM transactions WHERE card_token=? ORDER BY id DESC LIMIT 50");
-const getBoothByUser = db.prepare("SELECT * FROM booths WHERE username=?");
-const listAllBooths  = db.prepare("SELECT username,label FROM booths ORDER BY id ASC");
+const ensureCard      = db.prepare("INSERT OR IGNORE INTO cards (token) VALUES (?)");
+const getCard         = db.prepare("SELECT * FROM cards WHERE token=?");
+const listCards       = db.prepare("SELECT token,label,balance,updated_at FROM cards ORDER BY token ASC");
+const setLabel        = db.prepare("UPDATE cards SET label=? WHERE token=?");
+const setBal          = db.prepare("UPDATE cards SET balance=?, updated_at=datetime('now') WHERE token=?");
+const updateBal       = db.prepare("UPDATE cards SET balance=balance+?, updated_at=datetime('now') WHERE token=?");
+const insertTx        = db.prepare("INSERT INTO transactions (card_token, delta, source, reason, booth) VALUES (?,?,?,?,?)");
+const listAllTxForCard= db.prepare("SELECT card_token,delta,source,reason,booth,created_at FROM transactions WHERE card_token=? ORDER BY id DESC");
+const listAllTx       = db.prepare("SELECT * FROM transactions ORDER BY id ASC"); // 다운로드를 위한 새 쿼리
+const getBoothByUser  = db.prepare("SELECT * FROM booths WHERE username=?");
+const listAllBooths   = db.prepare("SELECT username,label FROM booths ORDER BY id ASC");
 const insertBooth     = db.prepare("INSERT INTO booths (username,password,label) VALUES (?,?,?)");
 const updateBoothInfo = db.prepare("UPDATE booths SET label=?, password=COALESCE(NULLIF(?, ''), password) WHERE username=?");
 const deleteBoothUser = db.prepare("DELETE FROM booths WHERE username=?");
-const deleteCard = db.prepare("DELETE FROM cards WHERE token=?");
-const deleteTx   = db.prepare("DELETE FROM transactions WHERE card_token=?");
+const deleteCard      = db.prepare("DELETE FROM cards WHERE token=?");
+const deleteTx        = db.prepare("DELETE FROM transactions WHERE card_token=?");
 
 // -------- 인증 --------
 function getBooth(req){
@@ -59,7 +60,6 @@ function getBooth(req){
 }
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "somangberlin2025";
 
-// -------- '문지기' 미들웨어: 관리자 페이지 보호 --------
 function checkLogin(req, res, next) {
   const raw = req.headers.cookie || "";
   const isAdmin = raw.split(";").map(s => s.trim()).includes("adm=1");
@@ -248,11 +248,11 @@ app.get("/b/:token", (req, res) => {
   ensureCard.run(token);
   const c = getCard.get(token);
   const boothUser = getBooth(req);
-  const txs = listTx.all(token);
+  const txs = listAllTxForCard.all(token);
   let txHtml = "";
   txs.forEach(t=>{
     txHtml += `<tr>
-      <td>${t.created_at}</td>
+      <td>${t.created_at.substring(2, 16).replace('T', ' ')}</td>
       <td class="${t.delta>=0?'plus':'minus'}">${t.delta>=0?'+':''}${t.delta}</td>
       <td>${t.source}</td>
       <td>${t.booth||''}</td>
@@ -460,7 +460,7 @@ app.get("/cards", (req, res) => {
 <video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
 <div class="wrap">
   <div class="header"><div class="brand">카드(사람) 관리</div><div class="nav"><a href="/dashboard">대시보드</a><a href="/booths">부스 관리</a><a href="/logout">로그아웃</a></div></div>
-  <div class="panel"><div class="grid"><div><label class="small">단일 추가/수정</label><form method="post" action="/card/upsert" class="row"><input name="token" placeholder="이름/토큰 (예: hong01)" required><input name="label" placeholder="라벨(선택, 예: 홍길동)"><input type="number" name="balance" placeholder="초기 잔액(예: 300)" required><button class="btn" type="submit">저장</button></form></div><div><label class="small">일괄 등록/수정 (토큰,초기잔액,라벨)</label><form method="post" action="/card/bulk"><textarea name="bulk" rows="7" placeholder="hong01,300,홍길동\nkim02,280,김철수"></textarea><div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end"><button class="btn" type="submit">일괄 적용</button></div></form></div></div></div>
+  <div class="panel"><div class="grid"><div><label class="small">단일 추가/수정</label><form method="post" action="/card/upsert" class="row"><input name="token" placeholder="이름/토큰 (예: hong01)" required><input name="label" placeholder="라벨(선택, 예: 홍길동)"><input type="number" name="balance" placeholder="초기 잔액(예: 300)" required><button class="btn" type="submit">저장</button></form></div><div><label class="small">일괄 등록/수정 (한 줄에 한 명 — <code>이름/토큰,초기잔액,라벨</code>)</label><form method="post" action="/card/bulk"><textarea name="bulk" rows="7" placeholder="김주인,100,Ju-in Kim\n이하나,150,Hana Lee"></textarea><div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end"><button class="btn" type="submit">일괄 적용</button></div></form></div></div></div>
   <div class="panel"><div class="toolbar"><label class="input"><input id="q" placeholder="이름/라벨 검색"></label><div class="segment" role="tablist" aria-label="정렬"><button class="active" data-sort="idx">기본순</button><button data-sort="name">이름순</button><button data-sort="bal-desc">잔액↓</button><button data-sort="bal-asc">잔액↑</button></div></div><div class="tableWrap"><table aria-label="카드 목록"><colgroup><col style="width:64px"><col style="width:30%"><col style="width:26%"><col style="width:14%"><col style="width:18%"></colgroup><thead><tr><th>#</th><th>이름/토큰</th><th>라벨</th><th>잔액</th><th>작업</th></tr></thead><tbody id="tb">${rowsHtml}</tbody></table></div></div>
 </div>
 <script>
@@ -484,35 +484,24 @@ app.get("/cards", (req, res) => {
 </script></body></html>`);
 });
 
-// ====== 개별 카드 관리 ======
+// ====== 개별 카드 수정 페이지 (분리됨) ======
 app.get("/cards/:token", (req, res) => {
   const token = req.params.token;
   ensureCard.run(token);
   const c = getCard.get(token);
-  const txs = listTx.all(token);
-  let txHtml = "";
-  txs.forEach(t=>{
-    txHtml += `<tr>
-      <td>${t.created_at}</td>
-      <td class="${t.delta>=0?'plus':'minus'}">${t.delta>=0?'+':''}${t.delta}</td>
-      <td>${t.source}</td>
-      <td>${t.booth||''}</td>
-      <td>${t.reason||''}</td>
-    </tr>`;
-  });
 
   res.send(`<!doctype html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1" /><title>${token} · 카드 관리</title>
 <style>
 :root{ --glass:#ffffffa6; --glass-brd:#ffffffd9; --ink:#0f172a; --muted:#475569; --accent:#2563eb; }
-*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:1100px;margin:0 auto;padding:28px 16px 80px} .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px} .brand{font-weight:900;font-size:26px;background:linear-gradient(90deg,#111,#334155,#64748b);-webkit-background-clip:text;background-clip:text;color:transparent} .nav{display:flex;gap:8px;flex-wrap:wrap} .nav a{padding:8px 12px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-brd);backdrop-filter:blur(8px);text-decoration:none;color:var(--ink);font-weight:600} .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px} @media (max-width:860px){ .grid{grid-template-columns:1fr; } } .card{background:var(--glass);border:1px solid var(--glass-brd);border-radius:18px;padding:16px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10)} h2,h3{margin:0 0 10px} .sub{color:#64748b;font-size:13px} .balance{display:flex;align-items:baseline;gap:12px;margin-bottom:12px} .balance .num{font-size:48px;font-weight:900;letter-spacing:.3px} .badge{display:inline-block;padding:6px 12px;border-radius:999px;background:#eef2ff;border:1px solid #dbeafe;color:#1e3a8a;font-weight:700} .actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px} .btn{padding:10px 14px;border:none;border-radius:10px;background:var(--accent);color:#fff;cursor:pointer;font-weight:700} .btn.gray{background:#111} .btn.ghost{background:#475569} .btn.danger{background:#ef4444} .row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:6px} input,textarea{width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffffd9} .tableWrap{background:var(--glass);border:1px solid var(--glass-brd);border-radius:18px;padding:8px;backdrop-filter:blur(12px);box-shadow:0 14px 48px rgba(0,0,0,.12)} table{width:100%;border-collapse:separate;border-spacing:0;border-radius:14px;overflow:hidden} th,td{padding:12px 10px;border-bottom:1px solid #e2e8f0;background:#ffffffcc} th{background:#f8fafc;font-weight:800} tr:last-child td{border-bottom:none} .plus{color:#16a34a;font-weight:900} .minus{color:#dc2626;font-weight:900}
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:900px;margin:0 auto;padding:28px 16px 80px} .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px} .brand{font-weight:900;font-size:26px;background:linear-gradient(90deg,#111,#334155,#64748b);-webkit-background-clip:text;background-clip:text;color:transparent} .nav{display:flex;gap:8px;flex-wrap:wrap} .nav a{padding:8px 12px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-brd);backdrop-filter:blur(8px);text-decoration:none;color:var(--ink);font-weight:600} .card{background:var(--glass);border:1px solid var(--glass-brd);border-radius:18px;padding:16px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10);margin-top:16px} h2,h3{margin:0 0 10px} .sub{color:#64748b;font-size:13px} .balance{display:flex;align-items:baseline;gap:12px;margin-bottom:12px} .balance .num{font-size:48px;font-weight:900;letter-spacing:.3px} .badge{display:inline-block;padding:6px 12px;border-radius:999px;background:#eef2ff;border:1px solid #dbeafe;color:#1e3a8a;font-weight:700} .actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px} .btn{padding:10px 14px;border:none;border-radius:10px;background:var(--accent);color:#fff;cursor:pointer;font-weight:700} .btn.gray{background:#64748b} .btn.ghost{background:#475569} .btn.danger{background:#ef4444} .row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:6px} input,textarea{width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffffd9}
 </style></head><body>
 <video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
 <div class="wrap">
   <div class="header"><div class="brand">개별 카드 관리</div><div class="nav"><a href="/dashboard">대시보드</a><a href="/cards">카드 목록</a><a href="/logout">로그아웃</a></div></div>
-  <div class="grid">
-    <div class="card"><h2>${token} <span class="badge">${c.label || "라벨 없음"}</span></h2><div class="sub">토큰(이름) · 라벨 · 현재 잔액을 관리합니다.</div><div class="balance"><div class="num" id="bal">${c.balance}</div><div class="sub">현재 잔액</div></div><div class="actions"><button class="btn" onclick="adj( 1)">+1</button><button class="btn" onclick="adj( 5)">+5</button><button class="btn" onclick="adj(10)">+10</button><button class="btn gray" onclick="adj(-1)">-1</button><button class="btn gray" onclick="adj(-5)">-5</button><button class="btn gray" onclick="adj(-10)">-10</button></div><div class="row"><input id="custom" type="number" placeholder="임의 증감 (예:+250 / -30)"><button class="btn" onclick="custom()">적용</button></div><div class="row"><input id="setv" type="number" placeholder="잔액을 특정 값으로 설정 (예: 280)"><button class="btn ghost" onclick="applySet()">잔액 설정</button></div><div class="row"><input id="label" type="text" value="${c.label||''}" placeholder="라벨 변경 (예: 2학년)"><button class="btn" onclick="saveLabel()">라벨 저장</button></div></div>
-    <div class="card"><h3>최근 내역</h3><div class="tableWrap" style="margin-top:8px"><table><thead><tr><th>시간</th><th>변동</th><th>출처</th><th>부스</th><th>사유</th></tr></thead><tbody id="tx">${txHtml}</tbody></table></div></div>
+  <div class="card">
+    <h2>${token} <span class="badge">${c.label || "라벨 없음"}</span></h2><div class="sub">토큰(이름) · 라벨 · 현재 잔액을 관리합니다.</div><div class="balance"><div class="num" id="bal">${c.balance}</div><div class="sub">현재 잔액</div></div><div class="actions"><button class="btn" onclick="adj( 1)">+1</button><button class="btn" onclick="adj( 5)">+5</button><button class="btn" onclick="adj(10)">+10</button><button class="btn gray" onclick="adj(-1)">-1</button><button class="btn gray" onclick="adj(-5)">-5</button><button class="btn gray" onclick="adj(-10)">-10</button></div><div class="row"><input id="custom" type="number" placeholder="임의 증감 (예:+250 / -30)"><button class="btn" onclick="custom()">적용</button></div><div class="row"><input id="setv" type="number" placeholder="잔액을 특정 값으로 설정 (예: 280)"><button class="btn ghost" onclick="applySet()">잔액 설정</button></div><div class="row"><input id="label" type="text" value="${c.label||''}" placeholder="라벨 변경 (예: 2학년)"><button class="btn" onclick="saveLabel()">라벨 저장</button></div>
+    <div style="margin-top:24px"><a href="/cards/${token}/history" class="btn gray">거래 내역 전체 보기</a></div>
   </div>
 </div>
 <script>
@@ -522,32 +511,64 @@ app.get("/cards/:token", (req, res) => {
     return r.json();
   }
   window.adj = async function(delta){
-    const res = await api("/api/admin-apply", { token:"${token}", delta, reason:"" });
-    if(res.ok) document.getElementById('bal').textContent = res.balance; else alert("실패");
-    location.reload();
+    const res = await api("/api/admin-apply", { token:"${token}", delta, reason:"관리자 수정" });
+    if(res.ok) { document.getElementById('bal').textContent = res.balance; } else { alert("실패"); }
   };
   window.custom = async function(){
     const delta = parseInt(document.getElementById('custom').value || "0");
     if(!delta) return;
-    const res = await api("/api/admin-apply", { token:"${token}", delta, reason:"" });
-    if(res.ok) document.getElementById('bal').textContent = res.balance; else alert("실패");
-    location.reload();
+    const res = await api("/api/admin-apply", { token:"${token}", delta, reason:"관리자 수정" });
+    if(res.ok) { document.getElementById('bal').textContent = res.balance; } else { alert("실패"); }
   };
   window.applySet = async function(){
     const value = parseInt(document.getElementById('setv').value);
     if(!Number.isInteger(value)) return;
     const res = await api("/api/admin-set-balance", { token:"${token}", value });
-    if(res.ok) document.getElementById('bal').textContent = res.balance; else alert("실패");
-    location.reload();
+    if(res.ok) { document.getElementById('bal').textContent = res.balance; } else { alert("실패"); }
   };
   window.saveLabel = async function(){
     const label = document.getElementById('label').value;
     const res = await api("/api/label", { token:"${token}", label });
-    if(res.ok) location.reload(); else alert("실패");
+    if(res.ok) { location.reload(); } else { alert("실패"); }
   };
 })();
 </script></body></html>`);
 });
+
+// ====== 거래 내역 페이지 (신설) ======
+app.get("/cards/:token/history", (req, res) => {
+  const token = req.params.token;
+  const c = getCard.get(token);
+  const txs = listAllTxForCard.all(token);
+  let txHtml = "";
+  txs.forEach(t=>{
+    txHtml += `<tr>
+      <td>${t.created_at.substring(2, 16).replace('T', ' ')}</td>
+      <td class="${t.delta>=0?'plus':'minus'}">${t.delta>=0?'+':''}${t.delta}</td>
+      <td>${t.booth||t.source}</td>
+      <td>${t.reason||''}</td>
+    </tr>`;
+  });
+
+  res.send(`<!doctype html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1" /><title>${token} · 거래 내역</title>
+<style>
+:root{ --glass:#ffffffa6; --glass-brd:#ffffffd9; --ink:#0f172a; --muted:#475569; --accent:#2563eb; }
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:1100px;margin:0 auto;padding:28px 16px 80px} .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px} .brand{font-weight:900;font-size:26px;} .brand .token{font-weight:400; color:var(--muted)} .nav{display:flex;gap:8px;flex-wrap:wrap} .nav a{padding:8px 12px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-brd);backdrop-filter:blur(8px);text-decoration:none;color:var(--ink);font-weight:600} .tableWrap{background:var(--glass);border:1px solid var(--glass-brd);border-radius:24px;padding:8px;backdrop-filter:blur(12px);box-shadow:0 14px 48px rgba(0,0,0,.12)} table{width:100%;border-collapse:separate;border-spacing:0;border-radius:16px;overflow:hidden;} th,td{padding:14px 12px;border-bottom:1px solid #e2e8f0;background:#ffffffcc;text-align:left} th{background:#f8fafc;font-weight:800;font-size:14px; text-align:left;} tr:last-child td{border-bottom:none} .plus{color:#16a34a;font-weight:700} .minus{color:#dc2626;font-weight:700}
+</style></head><body>
+<video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
+<div class="wrap">
+  <div class="header"><div class="brand">${c.label||token} <span class="token">님의 거래 내역</span></div><div class="nav"><a href="/dashboard">대시보드</a><a href="/cards/${token}">카드 수정</a><a href="/logout">로그아웃</a></div></div>
+  <div class="tableWrap">
+    <table>
+      <thead><tr><th>시간</th><th>변동</th><th>사용처</th><th>사유</th></tr></thead>
+      <tbody>${txHtml}</tbody>
+    </table>
+  </div>
+</div>
+</body></html>`);
+});
+
 
 // -------- 관리자 API --------
 app.post("/api/admin-apply", (req, res) => {
