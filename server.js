@@ -73,7 +73,7 @@ app.get("/", (req, res) => {
 *{box-sizing:border-box}
 body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif; color:var(--ink); display:flex; justify-content:center; align-items:center; height:100vh; text-align:center; }
 .bg{ position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:-1; }
-.content{ max-width: 800px; padding: 20px; }
+.content{ max-width: 800px; padding: 20px; margin-top: -5vh; } /* margin-top으로 위치 살짝 위로 조정 */
 .church{ font-weight: 600; font-size: 16px; opacity: .8; }
 h1{ font-size: 80px; font-weight: 500; margin: 0; line-height: 1.2; letter-spacing: 0.1em; color: white; }
 p{ font-size: 15px; line-height: 1.8; opacity: .8; max-width: 600px; margin: 24px auto; }
@@ -86,6 +86,7 @@ p{ font-size: 15px; line-height: 1.8; opacity: .8; max-width: 600px; margin: 24p
 
 /* 모바일 디자인 (가로 768px 이하) */
 @media (max-width: 768px) {
+  .content { margin-top: 0; } /* 모바일에선 다시 중앙으로 */
   h1{ font-size: 48px; letter-spacing: 0.05em; }
   p{ font-size: 14px; }
   .btn{ padding: 12px 28px; }
@@ -102,7 +103,7 @@ p{ font-size: 15px; line-height: 1.8; opacity: .8; max-width: 600px; margin: 24p
 <div class="content">
   <div class="church">베를린 소망교회</div>
   <h1>겨자씨 청소년부<br>달란트 잔치</h1>
-  <p>달란트 잔치는 하나님께서 우리에게 주신 재능, 시간 노력 같은 달란트를 하나님께서 주신 선물인 것을 알고, 함께 나누면서 기쁨을 누리고 하나님께 영광을 돌리는 시간입니다. 단순히 상품을 교환하는 시간이 아닌 하나님이 주신 달란트에 감사하며 믿음 안에서 서로 격려하고 나누며 기뻐하는 겨자씨 청소년부가 되길 바랍니다.</p>
+  <p>달란트 잔치는 하나님께서 우리에게 주신 재능, 시간 노력 같은 달란트를 하나님께서 주신 선물인 것을 알고,<br> 함께 나누면서 기쁨을 누리고 하나님께 영광을 돌리는 시간입니다. <br>단순히 상품을 교환하는 시간이 아닌 <br>하나님이 주신 달란트에 감사하며 믿음 안에서 서로 격려하고 나누며 기뻐하는 겨자씨 청소년부가 되길 바랍니다.</p>
   <a href="/booths-info" class="btn">부스 정보</a>
   <div class="social">
     <a href="https://www.instagram.com" target="_blank">
