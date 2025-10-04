@@ -7,7 +7,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
 // -------- DB --------
-const db = new Database("/data/db.sqlite");
+const db = new Database("./db.sqlite");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS cards (
