@@ -6,8 +6,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-// -------- DB (영구 디스크 경로를 다시 원래대로 수정) --------
-const db = new Database("./db.sqlite");
+// -------- DB --------
+const db = new Database("/data/db.sqlite");
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS cards (
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   card_token TEXT NOT NULL,
   delta INTEGER NOT NULL,
-  source TEXT NOT NULL,      -- 'booth' or 'admin'
+  source TEXT NOT NULL,
   reason TEXT DEFAULT '',
   booth TEXT DEFAULT '',
   created_at TEXT DEFAULT (datetime('now'))
@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS booths (
   username TEXT UNIQUE NOT NULL,
   password TEXT NOT NULL,
   label TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS site_content (
+  key TEXT PRIMARY KEY,
+  value TEXT
 );
 `);
 
@@ -51,6 +55,8 @@ const updateBoothInfo = db.prepare("UPDATE booths SET label=?, password=COALESCE
 const deleteBoothUser = db.prepare("DELETE FROM booths WHERE username=?");
 const deleteCard      = db.prepare("DELETE FROM cards WHERE token=?");
 const deleteTx        = db.prepare("DELETE FROM transactions WHERE card_token=?");
+const getContent      = db.prepare("SELECT value FROM site_content WHERE key=?");
+const setContent      = db.prepare("INSERT OR REPLACE INTO site_content (key, value) VALUES (?, ?)");
 
 // -------- 인증 --------
 function getBooth(req){
@@ -63,28 +69,28 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "somangberlin2025";
 function checkLogin(req, res, next) {
   const raw = req.headers.cookie || "";
   const isAdmin = raw.split(";").map(s => s.trim()).includes("adm=1");
-
-  if (isAdmin) {
-    next();
-  } else {
-    res.redirect("/login?ref=" + encodeURIComponent(req.originalUrl));
-  }
+  if (isAdmin) { next(); } 
+  else { res.redirect("/login?ref=" + encodeURIComponent(req.originalUrl)); }
 }
 
 // =================================================================
-// ||                                                             ||
 // ||      로그인 없이 접근 가능한 페이지들 (공개/부스용)         ||
-// ||                                                             ||
 // =================================================================
 
 // -------- 공개 정보 페이지 (홈페이지) --------
 app.get("/", (req, res) => {
+  const defaultPurpose = "달란트 잔치는 하나님께서 우리에게 주신 재능, 시간 노력 같은 달란트를 하나님께서 주신 선물인 것을 알고, 함께 나누면서 기쁨을 누리고 하나님께 영광을 돌리는 시간입니다. 단순히 상품을 교환하는 시간이 아닌 하나님이 주신 달란트에 감사하며 믿음 안에서 서로 격려하고 나누며 기뻐하는 겨자씨 청소년부가 되길 바랍니다.";
+  const defaultBooths = `ㆍ라떼는 말이야\nㆍ올리브 올드\nㆍ인생한컷\nㆍ소망은행\nㆍ노래방`;
+
+  const purpose = getContent.get('purpose')?.value || defaultPurpose;
+  let boothsText = getContent.get('booths')?.value || defaultBooths;
+  const boothsHtml = boothsText.split('\n').map(line => `<li>${line.trim()}</li>`).join('');
+
   res.send(`<!doctype html><html><head>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>달란트 잔치 정보</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" /><title>달란트 잔치 정보</title>
 <style>
 :root{--glass:#ffffffa6; --glass-brd:#ffffffd9; --ink:#0f172a; --muted:#475569; --accent:#2563eb;}
-*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:900px;margin:0 auto;padding:28px 16px 80px} .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px} .brand{font-weight:900;font-size:28px;background:linear-gradient(90deg,#111,#334155,#64748b);-webkit-background-clip:text;background-clip:text;color:transparent} .nav{display:flex;gap:8px;flex-wrap:wrap} .nav a{padding:10px 16px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-brd);backdrop-filter:blur(8px);text-decoration:none;color:var(--ink);font-weight:700} .panel{background:var(--glass);border:1px solid var(--glass-brd);border-radius:24px;padding:24px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10);margin-bottom:20px} h2{margin:0 0 16px;border-bottom:1px solid var(--glass-brd);padding-bottom:12px} ul{padding-left:20px;line-height:1.8} p{line-height:1.7; text-align:justify;} .footer-info{font-size:14px; color:var(--muted); text-align:center; margin-top: 40px;}
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:900px;margin:0 auto;padding:28px 16px 80px} .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px} .brand{font-weight:900;font-size:28px;background:linear-gradient(90deg,#111,#334155,#64748b);-webkit-background-clip:text;background-clip:text;color:transparent} .nav{display:flex;gap:8px;flex-wrap:wrap} .nav a{padding:10px 16px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-brd);backdrop-filter:blur(8px);text-decoration:none;color:var(--ink);font-weight:700} .panel{background:var(--glass);border:1px solid var(--glass-brd);border-radius:24px;padding:24px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10);margin-bottom:20px} h2{margin:0 0 16px;border-bottom:1px solid var(--glass-brd);padding-bottom:12px} ul{padding-left:0; list-style:none;} p{line-height:1.7; text-align:justify;} .footer-info{font-size:14px; color:var(--muted); text-align:center; margin-top: 40px;}
 </style>
 </head><body>
 <video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
@@ -96,26 +102,14 @@ app.get("/", (req, res) => {
       <a href="/booth/login">부스 로그인</a>
     </div>
   </div>
-
   <div class="panel">
     <h2>🎈 달란트 잔치의 목적</h2>
-    <p>달란트 잔치는 하나님께서 우리에게 주신 재능, 시간 노력 같은 달란트를 하나님께서 주신 선물인 것을 알고, 함께 나누면서 기쁨을 누리고 하나님께 영광을 돌리는 시간입니다. 단순히 상품을 교환하는 시간이 아닌 하나님이 주신 달란트에 감사하며 믿음 안에서 서로 격려하고 나누며 기뻐하는 겨자씨 청소년부가 되길 바랍니다.</p>
+    <p>${purpose}</p>
   </div>
-
   <div class="panel">
-    <h2>✨ 부스 및 담당자 안내</h2>
-    <ul>
-      <li><b>편의점:</b> 정다운 선생님</li>
-      <li><b>게임방:</b> 김지호 선생님</li>
-      <li><b>카페:</b> 박시온 선생님</li>
-      <li><b>소망은행:</b> 김주인 선생님</li>
-      <li><b>서점 및 중고나라:</b> 김기욱 집사님</li>
-      <li><b>올리브영:</b> 나찬민 전도사님</li>
-      <li><b>인생한컷:</b> 임하람 선생님</li>
-      <li><b>노래방:</b> 미정</li>
-    </ul>
+    <h2>✨ 부스 안내</h2>
+    <ul>${boothsHtml}</ul>
   </div>
-
   <div class="footer-info">
     주최: 소망교회 겨자씨 청소년부<br>
     장소: 베를린 소망교회 게마인데잘
@@ -303,9 +297,7 @@ app.post("/api/booth-apply", (req, res) => {
 
 
 // =================================================================
-// ||                                                             ||
 // ||      지금부터 나오는 모든 페이지는 관리자 로그인이 필요     ||
-// ||                                                             ||
 // =================================================================
 app.use(checkLogin);
 
@@ -332,15 +324,7 @@ app.get("/dashboard", (req, res) => {
 </style></head><body>
 <video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
 <div class="wrap">
-  <div class="header">
-    <div class="brand">달란트 대시보드</div>
-    <div class="nav">
-      <a href="/cards">카드 관리</a>
-      <a href="/booths">부스 관리</a>
-      <a href="/download-tx" class="btn gray">거래내역 다운로드</a>
-      <a href="/logout">로그아웃</a>
-    </div>
-  </div>
+  <div class="header"><div class="brand">달란트 대시보드</div><div class="nav"><a href="/cards">카드 관리</a><a href="/booths">부스 관리</a><a href="/settings">홈페이지 관리</a><a href="/download-tx">거래내역 다운로드</a><a href="/logout">로그아웃</a></div></div>
   <div class="metrics"><div class="metric"><div class="lbl">등록 인원</div><div class="num" id="m-count">${rows.length}</div></div><div class="metric"><div class="lbl">총 잔액 합</div><div class="num" id="m-sum">0</div></div><div class="metric"><div class="lbl">평균 잔액</div><div class="num" id="m-avg">0</div></div></div>
   <div class="panel">
     <div class="toolbar"><label class="input"><input id="q" placeholder="이름/라벨 검색 (예: 홍길동)"></label><div class="segment"><button class="active" data-sort="idx">기본순</button><button data-sort="name">이름순</button><button data-sort="bal-desc">잔액↓</button><button data-sort="bal-asc">잔액↑</button></div></div>
@@ -384,6 +368,48 @@ app.get("/dashboard", (req, res) => {
   function renumber(){ let i=1; tb.querySelectorAll('tr').forEach(tr=>{ if(tr.style.display==='none') return; tr.querySelector('.idx').textContent=i++; }); }
 })();
 </script></body></html>`);
+});
+
+// ====== 홈페이지 관리 페이지 (신설) ======
+app.get("/settings", (req, res) => {
+  const defaultPurpose = "달란트 잔치는 하나님께서 우리에게 주신 재능, 시간 노력 같은 달란트를 하나님께서 주신 선물인 것을 알고, 함께 나누면서 기쁨을 누리고 하나님께 영광을 돌리는 시간입니다. 단순히 상품을 교환하는 시간이 아닌 하나님이 주신 달란트에 감사하며 믿음 안에서 서로 격려하고 나누며 기뻐하는 겨자씨 청소년부가 되길 바랍니다.";
+  const defaultBooths = `ㆍ라떼는 말이야\nㆍ올리브 올드\nㆍ인생한컷\nㆍ소망은행\nㆍ노래방`;
+  
+  const purpose = getContent.get('purpose')?.value || defaultPurpose;
+  const booths = getContent.get('booths')?.value || defaultBooths;
+
+  res.send(`<!doctype html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1" /><title>홈페이지 관리</title>
+<style>
+:root{ --glass:#ffffffa6; --glass-brd:#ffffffd9; --ink:#0f172a; --muted:#475569; --accent:#2563eb; }
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:1100px;margin:0 auto;padding:28px 16px 80px} .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px} .brand{font-weight:900;font-size:26px;} .nav{display:flex;gap:8px;flex-wrap:wrap} .nav a{padding:8px 12px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-brd);backdrop-filter:blur(8px);text-decoration:none;color:var(--ink);font-weight:600} .panel{background:var(--glass);border:1px solid var(--glass-brd);border-radius:18px;padding:16px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10);margin-bottom:16px} label{display:block; font-weight:600; margin-bottom:8px;} textarea{width:100%; height:180px; padding:12px; border-radius:12px; border:1px solid var(--glass-brd); font-size:15px; line-height:1.6;} .btn-wrap{display:flex;justify-content:flex-end; margin-top:16px;} .btn{padding:10px 20px;border:none;border-radius:10px;background:var(--accent);color:#fff;cursor:pointer;font-weight:700; font-size:16px;}
+</style>
+</head><body>
+<video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
+<div class="wrap">
+  <div class="header"><div class="brand">홈페이지 관리</div><div class="nav"><a href="/dashboard">대시보드</a><a href="/cards">카드 관리</a><a href="/logout">로그아웃</a></div></div>
+  <form method="post" action="/settings/update">
+    <div class="panel">
+      <label for="purpose">🎈 달란트 잔치의 목적</label>
+      <textarea id="purpose" name="purpose">${purpose}</textarea>
+    </div>
+    <div class="panel">
+      <label for="booths">✨ 부스 및 담당자 안내 (한 줄에 하나씩 입력)</label>
+      <textarea id="booths" name="booths">${booths}</textarea>
+    </div>
+    <div class="btn-wrap">
+      <button class="btn" type="submit">저장하기</button>
+    </div>
+  </form>
+</div>
+</body></html>`);
+});
+
+app.post("/settings/update", (req, res) => {
+  const { purpose, booths } = req.body;
+  if (purpose != null) setContent.run('purpose', purpose);
+  if (booths != null) setContent.run('booths', booths);
+  res.redirect("/settings");
 });
 
 // ====== 부스 계정 관리 ======
@@ -463,7 +489,7 @@ app.get("/cards", (req, res) => {
 <meta name="viewport" content="width=device-width, initial-scale=1" /><title>카드 관리</title>
 <style>
 :root{ --glass:#ffffffa6; --glass-brd:#ffffffd9; --ink:#0f172a; --muted:#475569; --accent:#2563eb; }
-*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:1100px;margin:0 auto;padding:28px 16px 80px} .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px} .brand{font-weight:900;font-size:26px;background:linear-gradient(90deg,#111,#334155,#64748b);-webkit-background-clip:text;background-clip:text;color:transparent} .nav{display:flex;gap:8px;flex-wrap:wrap} .nav a{padding:8px 12px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-brd);backdrop-filter:blur(8px);text-decoration:none;color:var(--ink);font-weight:600} .panel{background:var(--glass);border:1px solid var(--glass-brd);border-radius:18px;padding:16px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10);margin-bottom:16px} .grid{display:grid;grid-template-columns:1fr;gap:12px} @media (min-width:860px){ .grid{grid-template-columns:1fr 1fr} } label.small{display:block;font-size:12px;color:var(--muted);margin-bottom:6px} .row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px} textarea,input[type="text"],input[type="number"]{width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffffd9} .btn{padding:10px 14px;border:none;border-radius:10px;background:var(--accent);color:#fff;cursor:pointer;font-weight:700} .toolbar{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin-bottom:14px} .input{display:flex;align-items:center;gap:8px;background:#ffffffc7;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px} .input input{border:0;outline:none;background:transparent;width:100%;font-size:15px} .segment{display:inline-flex;gap:6px;padding:4px;background:#fff;border:1px solid #e2e8f0;border-radius:14px} .segment button{padding:9px 14px;border:0;background:transparent;cursor:pointer;font-weight:700;color:#64748b;border-radius:10px} .segment button.active{background:#111;color:#fff} .tableWrap{background:var(--glass);border:1px solid var(--glass-brd);border-radius:24px;padding:8px;backdrop-filter:blur(12px);box-shadow:0 14px 48px rgba(0,0,0,.12)} table{width:100%;border-collapse:separate;border-spacing:0;border-radius:16px;overflow:hidden;table-layout:fixed} th,td{padding:14px 12px;border-bottom:1px solid #e2e8f0;background:#ffffffcc;text-align:center} th{background:#f8fafc;font-weight:800} tr:last-child td{border-bottom:none} tbody tr:hover td{background:#fff} th:nth-child(2), td:nth-child(2){text-align:left} th:first-child,td:first-child{padding-left:12px} th:last-child, td:last-child{padding-right:12px} .idx{color:#94a3b8;font-weight:700} .tok span{padding:6px 12px;border-radius:999px;background:#eef2ff;border:1px solid #dbeafe;color:#1e3a8a;font-weight:700} .bal{font-weight:900;font-variant-numeric:tabular-nums} .actions a{color:var(--accent);text-decoration:none}
+*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Malgun Gothic,sans-serif;color:var(--ink)} video.bg{position:fixed;inset:0;min-width:100%;min-height:100%;object-fit:cover;z-index:-2} .shade{position:fixed;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,.35));z-index:-1} .wrap{max-width:1100px;margin:0 auto;padding:28px 16px 80px} .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px} .brand{font-weight:900;font-size:26px;background:linear-gradient(90deg,#111,#334155,#64748b);-webkit-background-clip:text;background-clip:text;color:transparent} .nav{display:flex;gap:8px;flex-wrap:wrap} .nav a{padding:8px 12px;border-radius:999px;background:var(--glass);border:1px solid var(--glass-brd);backdrop-filter:blur(8px);text-decoration:none;color:var(--ink);font-weight:600} .panel{background:var(--glass);border:1px solid var(--glass-brd);border-radius:18px;padding:16px;backdrop-filter:blur(12px);box-shadow:0 12px 44px rgba(0,0,0,.10);margin-bottom:16px} .grid{display:grid;grid-template-columns:1fr;gap:12px} @media (min-width:860px){ .grid{grid-template-columns:1fr 1fr} } label.small{display:block;font-size:12px;color:var(--muted);margin-bottom:6px} .row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px} textarea{width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffffd9; font-family:inherit; font-size:15px; line-height:1.6;} .btn{padding:10px 14px;border:none;border-radius:10px;background:var(--accent);color:#fff;cursor:pointer;font-weight:700} .toolbar{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin-bottom:14px} .input{display:flex;align-items:center;gap:8px;background:#ffffffc7;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px} .input input{border:0;outline:none;background:transparent;width:100%;font-size:15px} .segment{display:inline-flex;gap:6px;padding:4px;background:#fff;border:1px solid #e2e8f0;border-radius:14px} .segment button{padding:9px 14px;border:0;background:transparent;cursor:pointer;font-weight:700;color:#64748b;border-radius:10px} .segment button.active{background:#111;color:#fff} .tableWrap{background:var(--glass);border:1px solid var(--glass-brd);border-radius:24px;padding:8px;backdrop-filter:blur(12px);box-shadow:0 14px 48px rgba(0,0,0,.12)} table{width:100%;border-collapse:separate;border-spacing:0;border-radius:16px;overflow:hidden;table-layout:fixed} th,td{padding:14px 12px;border-bottom:1px solid #e2e8f0;background:#ffffffcc;text-align:center} th{background:#f8fafc;font-weight:800} tr:last-child td{border-bottom:none} tbody tr:hover td{background:#fff} th:nth-child(2), td:nth-child(2){text-align:left} th:first-child,td:first-child{padding-left:12px} th:last-child, td:last-child{padding-right:12px} .idx{color:#94a3b8;font-weight:700} .tok span{padding:6px 12px;border-radius:999px;background:#eef2ff;border:1px solid #dbeafe;color:#1e3a8a;font-weight:700} .bal{font-weight:900;font-variant-numeric:tabular-nums} .actions a{color:var(--accent);text-decoration:none}
 </style></head><body>
 <video autoplay muted loop playsinline class="bg"><source src="/bg.mp4" type="video/mp4"></video><div class="shade"></div>
 <div class="wrap">
@@ -666,16 +692,25 @@ app.post("/booth/delete", (req, res) => {
 // 거래내역 다운로드 (CSV)
 app.get("/download-tx", (req, res) => {
   const rows = listAllTx.all();
-  // CSV 헤더
-  let csv = "ID,카드토큰,변동량,출처,사유,부스,시간\n";
-  // CSV 내용
+  // CSV 헤더 (엑셀에서 한글 깨짐 방지 - BOM 추가)
+  const BOM = "\uFEFF";
+  let csv = BOM + "ID,카드토큰,라벨,변동량,출처,사유,부스,시간\n";
+  
+  // CSV 내용 만들기 (각 row에 맞는 라벨 찾기 포함)
+  const allCards = listCards.all();
+  const cardLabelMap = new Map(allCards.map(c => [c.token, c.label]));
+
   rows.forEach(r => {
-    csv += [r.id, r.card_token, r.delta, r.source, `"${r.reason||''}"`, `"${r.booth||''}"`, r.created_at].join(",") + "\n";
+    const label = cardLabelMap.get(r.card_token) || '';
+    // 사유나 부스 이름에 쉼표(,)가 있을 경우를 대비해 큰따옴표("")로 감싸기
+    const reason = `"${r.reason||''}"`;
+    const booth = `"${r.booth||''}"`;
+    csv += [r.id, r.card_token, label, r.delta, r.source, reason, booth, r.created_at].join(",") + "\n";
   });
   
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", "attachment; filename=transactions.csv");
-  res.send(Buffer.from(csv, 'utf-8'));
+  res.setHeader("Content-Disposition", 'attachment; filename="transactions-' + new Date().toISOString().substring(0,10) + '.csv"');
+  res.send(csv);
 });
 
 
