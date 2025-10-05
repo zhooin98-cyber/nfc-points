@@ -6,8 +6,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-// -------- DB (영구 디스크 경로로 수정) --------
-const db = new Database("/data/db.sqlite");
+// -------- DB (기본 경로 사용) --------
+const db = new Database("./db.sqlite");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS cards (
@@ -806,3 +806,4 @@ app.get("/download-tx", (req, res) => {
 // -------- 서버 시작 --------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("listening on http://0.0.0.0:" + PORT));
+```
