@@ -6,8 +6,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-// -------- DB (기본 경로 사용) --------
-const db = new Database("./db.sqlite");
+// -------- DB (영구 디스크 경로로 수정) --------
+const db = new Database("/data/db.sqlite");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS cards (
