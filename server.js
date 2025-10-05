@@ -24,6 +24,54 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS site_content ( key TEXT PRIMARY KEY, value TEXT );
 `);
 
+// -------- 기본 데이터 추가 (서버 시작 시) --------
+const countStmt = db.prepare("SELECT count(*) as count FROM cards");
+const { count } = countStmt.get();
+
+if (count === 0) {
+  console.log("Database is empty. Populating with default data...");
+  const defaultUsers = [
+    { token: '게스트 1', balance: 100, label: '게스트 1' },
+    { token: '게스트 2', balance: 100, label: '게스트 2' },
+    { token: '게스트 3', balance: 100, label: '게스트 3' },
+    { token: '게스트 4', balance: 100, label: '게스트 4' },
+    { token: '김민지', balance: 130, label: '김민지' },
+    { token: '김승기', balance: 50, label: '김승기' },
+    { token: '김주하', balance: 99, label: '김주하' },
+    { token: '김주헌', balance: 146, label: '김주헌' },
+    { token: '김지민', balance: 111, label: '김지민' },
+    { token: '김한나', balance: 167, label: '김한나' },
+    { token: '김한슬', balance: 50, label: '김한슬' },
+    { token: '김한영', balance: 154, label: '김한영' },
+    { token: '누리', balance: 58, label: '누리' },
+    { token: '박로이', balance: 50, label: '박로이' },
+    { token: '박시우', balance: 159, label: '박시우' },
+    { token: '박인하', balance: 137, label: '박인하' },
+    { token: '배이본', balance: 50, label: '배이본' },
+    { token: '변서진', balance: 175, label: '변서진' },
+    { token: '오채은', balance: 77, label: '오채은' },
+    { token: '오하린', balance: 128, label: '오하린' },
+    { token: '윤시엘', balance: 95, label: '윤시엘' },
+    { token: '이유진', balance: 97, label: '이유진' },
+    { token: '임노엘', balance: 75, label: '임노엘' },
+    { token: '임시연', balance: 66, label: '임시연' },
+    { token: '차이레', balance: 190, label: '차이레' },
+    { token: '클로에', balance: 59, label: '클로에' },
+    { token: '홍라임', balance: 122, label: '홍라임' }
+  ];
+
+  const insertStmt = db.prepare("INSERT INTO cards (token, balance, label) VALUES (?, ?, ?)");
+  const insertMany = db.transaction((users) => {
+    for (const user of users) {
+      insertStmt.run(user.token, user.balance, user.label);
+    }
+  });
+
+  insertMany(defaultUsers);
+  console.log(`${defaultUsers.length} users have been added to the database.`);
+}
+
+
 // DB 쿼리
 const ensureCard = db.prepare("INSERT OR IGNORE INTO cards (token) VALUES (?)");
 const getCard = db.prepare("SELECT * FROM cards WHERE token=?");
@@ -758,4 +806,3 @@ app.get("/download-tx", (req, res) => {
 // -------- 서버 시작 --------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("listening on http://0.0.0.0:" + PORT));
-
